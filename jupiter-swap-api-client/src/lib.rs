@@ -3,14 +3,17 @@ use std::collections::HashMap;
 use quote::{InternalQuoteRequest, QuoteRequest, QuoteResponse};
 use reqwest::{Client, Response};
 use serde::de::DeserializeOwned;
+use solana_sdk::pubkey::Pubkey;
 use swap::{SwapInstructionsResponse, SwapInstructionsResponseInternal, SwapRequest, SwapResponse};
 use thiserror::Error;
+use price::{PriceRequest, PriceResponse};
 
 pub mod quote;
 pub mod route_plan_with_metadata;
 pub mod serde_helpers;
 pub mod swap;
 pub mod transaction_config;
+pub mod price;
 
 #[derive(Clone)]
 pub struct JupiterSwapApiClient {
@@ -91,5 +94,46 @@ impl JupiterSwapApiClient {
         check_status_code_and_deserialize::<SwapInstructionsResponseInternal>(response)
             .await
             .map(Into::into)
+    }
+    
+    /// Get prices for one or more tokens from the Jupiter Price API v2
+    /// 
+    /// By default, prices are in terms of USDC. Use the vs_token parameter to get prices in terms of another token.
+    pub async fn get_prices(&self, price_request: &PriceRequest) -> Result<PriceResponse, ClientError> {
+        let url = format!("https://price-api.jup.ag/v2");
+        let response = Client::new()
+            .get(url)
+            .query(&price_request)
+            .send()
+            .await?;
+        check_status_code_and_deserialize(response).await
+    }
+    
+    /// Helper method to get the price for a single token in terms of USDC
+    pub async fn get_token_price(&self, token_mint: &Pubkey) -> Result<PriceResponse, ClientError> {
+        let request = PriceRequest::new_single(token_mint);
+        self.get_prices(&request).await
+    }
+    
+    /// Helper method to get prices for multiple tokens in terms of USDC
+    pub async fn get_token_prices(&self, token_mints: &[Pubkey]) -> Result<PriceResponse, ClientError> {
+        let request = PriceRequest::new_multiple(token_mints);
+        self.get_prices(&request).await
+    }
+    
+    /// Helper method to get the price of a token in terms of another token
+    pub async fn get_token_pair_price(
+        &self,
+        token_mint: &Pubkey,
+        vs_token: &Pubkey
+    ) -> Result<PriceResponse, ClientError> {
+        let request = PriceRequest::new_single(token_mint).with_vs_token(vs_token);
+        self.get_prices(&request).await
+    }
+    
+    /// Helper method to get detailed price information including extra details
+    pub async fn get_detailed_price(&self, token_mint: &Pubkey) -> Result<PriceResponse, ClientError> {
+        let request = PriceRequest::new_single(token_mint).with_extra_info(true);
+        self.get_prices(&request).await
     }
 }
