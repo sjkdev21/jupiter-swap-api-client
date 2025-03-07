@@ -100,7 +100,7 @@ impl JupiterSwapApiClient {
     /// 
     /// By default, prices are in terms of USDC. Use the vs_token parameter to get prices in terms of another token.
     pub async fn get_prices(&self, price_request: &PriceRequest) -> Result<PriceResponse, ClientError> {
-        let url = format!("https://price-api.jup.ag/v2");
+        let url = format!("{}/price/v2", self.base_path);
         let response = Client::new()
             .get(url)
             .query(&price_request)

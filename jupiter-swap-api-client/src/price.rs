@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use solana_sdk::pubkey::Pubkey;
 
-use crate::serde_helpers::field_as_string;
 
 /// Helper module for serializing/deserializing Option<u64> as string
 pub mod field_as_string_option {
