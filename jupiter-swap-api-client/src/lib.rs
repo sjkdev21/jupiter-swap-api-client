@@ -7,6 +7,7 @@ use solana_sdk::pubkey::Pubkey;
 use swap::{SwapInstructionsResponse, SwapInstructionsResponseInternal, SwapRequest, SwapResponse};
 use thiserror::Error;
 use price::{PriceRequest, PriceResponse};
+use price_v1::{PriceV1Request, PriceV1Response};
 
 pub mod quote;
 pub mod route_plan_with_metadata;
@@ -14,6 +15,7 @@ pub mod serde_helpers;
 pub mod swap;
 pub mod transaction_config;
 pub mod price;
+pub mod price_v1;
 
 #[derive(Clone)]
 pub struct JupiterSwapApiClient {
@@ -135,5 +137,56 @@ impl JupiterSwapApiClient {
     pub async fn get_detailed_price(&self, token_mint: &Pubkey) -> Result<PriceResponse, ClientError> {
         let request = PriceRequest::new_single(token_mint).with_extra_info(true);
         self.get_prices(&request).await
+    }
+    
+    /// Get prices using the Jupiter Price API v1
+    /// 
+    /// By default, prices are in terms of USDC. Use the vs_token parameter to get prices in terms of another token.
+    pub async fn get_prices_v1(&self, price_request: &PriceV1Request) -> Result<PriceV1Response, ClientError> {
+        let url = format!("{}/price", self.base_path);
+        let response = Client::new()
+            .get(url)
+            .query(&price_request)
+            .send()
+            .await?;
+        check_status_code_and_deserialize(response).await
+    }
+    
+    /// Helper method to get the price for a single token in terms of USDC using v1 API
+    pub async fn get_token_price_v1(&self, token_mint: &Pubkey) -> Result<PriceV1Response, ClientError> {
+        let request = PriceV1Request::new_single_pubkey(token_mint);
+        self.get_prices_v1(&request).await
+    }
+    
+    /// Helper method to get the price for a single token by symbol in terms of USDC using v1 API
+    pub async fn get_token_price_by_symbol_v1(&self, token_symbol: &str) -> Result<PriceV1Response, ClientError> {
+        let request = PriceV1Request::new_single(token_symbol);
+        self.get_prices_v1(&request).await
+    }
+    
+    /// Helper method to get prices for multiple tokens in terms of USDC using v1 API
+    pub async fn get_token_prices_v1(&self, token_mints: &[Pubkey]) -> Result<PriceV1Response, ClientError> {
+        let request = PriceV1Request::new_multiple_pubkeys(token_mints);
+        self.get_prices_v1(&request).await
+    }
+    
+    /// Helper method to get the price of a token in terms of another token using v1 API
+    pub async fn get_token_pair_price_v1(
+        &self,
+        token_mint: &Pubkey,
+        vs_token: &Pubkey
+    ) -> Result<PriceV1Response, ClientError> {
+        let request = PriceV1Request::new_single_pubkey(token_mint).with_vs_token_pubkey(vs_token);
+        self.get_prices_v1(&request).await
+    }
+    
+    /// Helper method to get the price of a token by symbol in terms of another token by symbol using v1 API
+    pub async fn get_token_pair_price_by_symbol_v1(
+        &self,
+        token_symbol: &str,
+        vs_token_symbol: &str
+    ) -> Result<PriceV1Response, ClientError> {
+        let request = PriceV1Request::new_single(token_symbol).with_vs_token(vs_token_symbol);
+        self.get_prices_v1(&request).await
     }
 }
